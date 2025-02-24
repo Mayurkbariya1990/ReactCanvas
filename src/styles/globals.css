@@ -1,0 +1,31 @@
+.react-grid-item {
+  transition: all 200ms ease;
+  transition-property: left, top, width, height;
+  cursor: grab;
+}
+
+.react-grid-item.react-draggable-dragging {
+  z-index: 100;
+  cursor: grabbing !important;
+  transition: none;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.react-grid-item > .react-resizable-handle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  bottom: 0;
+  right: 0;
+  cursor: se-resize;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.react-grid-item:hover > .react-resizable-handle {
+  opacity: 1;
+}
+
+.react-grid-item:active {
+  cursor: grabbing;
+} 
