@@ -11,6 +11,7 @@ import "react-resizable/css/styles.css";
 import { Input } from './ui/input';
 import { Pencil, Check, X, Trash2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import { Textarea } from './ui/textarea';
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
@@ -291,12 +292,15 @@ const GridLayout = () => {
             <EditButtons item={item} />
             <div className="h-full flex items-center justify-center">
               {isEditing ? (
-                <div className="space-y-4 w-full px-2 sm:px-4">
+                <div className="space-y-4 w-full px-2 sm:px-4" onClick={(e) => e.stopPropagation()}>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Button Text</label>
                     <Input
                       value={editingContent.content}
-                      onChange={(e) => setEditingContent({ ...editingContent, content: e.target.value })}
+                      onChange={(e) => setEditingContent(prev => ({
+                        ...prev,
+                        content: e.target.value
+                      }))}
                       placeholder="Button text"
                       className="border-indigo-100 focus:border-indigo-300"
                     />
@@ -305,7 +309,10 @@ const GridLayout = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Action</label>
                     <Input
                       value={editingContent.action}
-                      onChange={(e) => setEditingContent({ ...editingContent, action: e.target.value })}
+                      onChange={(e) => setEditingContent(prev => ({
+                        ...prev,
+                        action: e.target.value
+                      }))}
                       placeholder="console.log('clicked')"
                       className="font-mono text-sm border-indigo-100 focus:border-indigo-300"
                     />
@@ -313,64 +320,63 @@ const GridLayout = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Style</label>
                     <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setEditingContent({ 
-                          ...editingContent, 
-                          variant: 'primary'
-                        })}
-                        className={`px-3 py-1 rounded-md text-sm ${
-                          editingContent.variant === 'primary' 
-                            ? 'bg-indigo-500 text-white' 
-                            : 'bg-indigo-50 text-indigo-600'
-                        }`}
-                      >
-                        Primary
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditingContent({ 
-                          ...editingContent, 
-                          variant: 'secondary'
-                        })}
-                        className={`px-3 py-1 rounded-md text-sm ${
-                          editingContent.variant === 'secondary' 
-                            ? 'bg-gray-800 text-white' 
-                            : 'bg-gray-100 text-gray-600'
-                        }`}
-                      >
-                        Secondary
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditingContent({ 
-                          ...editingContent, 
-                          variant: 'outline'
-                        })}
-                        className={`px-3 py-1 rounded-md text-sm ${
-                          editingContent.variant === 'outline' 
-                            ? 'border-2 border-indigo-500 text-indigo-600' 
-                            : 'border border-gray-200 text-gray-600'
-                        }`}
-                      >
-                        Outline
-                      </button>
+                      {['primary', 'secondary', 'outline'].map((variant) => (
+                        <button
+                          key={variant}
+                          type="button"
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setEditingContent(prev => ({
+                              ...prev,
+                              variant: variant as 'primary' | 'secondary' | 'outline'
+                            }));
+                          }}
+                          className={`
+                            px-3 py-1 rounded-md text-sm transition-all duration-200
+                            ${variant === 'primary' && editingContent.variant === 'primary' 
+                              ? 'bg-indigo-500 text-white' 
+                              : variant === 'primary' 
+                              ? 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                              : ''}
+                            ${variant === 'secondary' && editingContent.variant === 'secondary'
+                              ? 'bg-gray-800 text-white'
+                              : variant === 'secondary'
+                              ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              : ''}
+                            ${variant === 'outline' && editingContent.variant === 'outline'
+                              ? 'border-2 border-indigo-500 text-indigo-600'
+                              : variant === 'outline'
+                              ? 'border border-gray-200 text-gray-600 hover:border-gray-300'
+                              : ''}
+                          `}
+                        >
+                          {variant.charAt(0).toUpperCase() + variant.slice(1)}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
               ) : (
                 <Button 
-                  onClick={() => {
+                  type="button"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     try {
-                      new Function(item.action!)();
+                      const actionFn = new Function(item.action || '');
+                      actionFn();
                     } catch (error) {
                       console.error('Error executing button action:', error);
                     }
                   }}
+                  variant={item.variant || 'primary'}
                   className={`
-                    px-6 py-2 rounded-lg font-medium transition-all duration-200 transform hover:scale-105
-                    ${item.variant === 'primary' ? 'bg-indigo-500 hover:bg-indigo-600 text-white shadow-md hover:shadow-lg' : ''}
-                    ${item.variant === 'secondary' ? 'bg-gray-800 hover:bg-gray-900 text-white shadow-md hover:shadow-lg' : ''}
+                    w-full max-w-[200px] transition-all duration-200 transform hover:scale-105
+                    ${item.variant === 'primary' ? 'bg-indigo-500 hover:bg-indigo-600 text-white' : ''}
+                    ${item.variant === 'secondary' ? 'bg-gray-800 hover:bg-gray-900 text-white' : ''}
                     ${item.variant === 'outline' ? 'border-2 border-indigo-500 text-indigo-600 hover:bg-indigo-50' : ''}
                   `}
                 >
@@ -429,7 +435,7 @@ const GridLayout = () => {
                       onChange={(e) => setEditingContent({ ...editingContent, title: e.target.value })}
                       placeholder="Card Title"
                     />
-                    <Input
+                    <Textarea
                       value={editingContent.description}
                       onChange={(e) => setEditingContent({ ...editingContent, description: e.target.value })}
                       placeholder="Card Description"
@@ -450,18 +456,17 @@ const GridLayout = () => {
         return (
           <Card {...cardProps}>
             <EditButtons item={item} />
-            <div className="h-full overflow-auto">
+            <div className="h-full overflow-auto relative">
               {isEditing ? (
-                <div className="space-y-4">
+                <div className="space-y-4 p-4" onClick={(e) => e.stopPropagation()}>
                   <div>
                     <label className="block text-sm font-medium mb-1">Headers</label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-center relative">
                       {editingContent.headers.map((header: string, index: number) => (
                         <Input
                           key={index}
                           value={header}
                           onChange={(e) => {
-                            console.log("DATA")
                             const newHeaders = [...editingContent.headers];
                             newHeaders[index] = e.target.value;
                             setEditingContent({ ...editingContent, headers: newHeaders });
@@ -469,47 +474,71 @@ const GridLayout = () => {
                         />
                       ))}
                       <Button
-                        size="lg"
+                        size="sm"
+                        variant="outline"
+                        className="z-50 hover:bg-gray-100 relative"
+                        type="button"
+                        onMouseDown={(e) => e.stopPropagation()}
                         onClick={(e) => {
-                          console.log("DATA")
+                          e.preventDefault();
                           e.stopPropagation();
-                          setEditingContent({
-                            ...editingContent,
-                            headers: [...editingContent.headers, ''],
-                            rows: editingContent.rows.map((row: string[]) => [...row, ''])
-                          });
+                          
+                          const currentHeaders = [...editingContent.headers];
+                          const currentRows = editingContent.rows.map(row => [...row]);
+                          
+                          currentHeaders.push('');
+                          currentRows.forEach(row => row.push(''));
+                          
+                          setEditingContent(prev => ({
+                            ...prev,
+                            headers: currentHeaders,
+                            rows: currentRows
+                          }));
                         }}
                       >
                         +
                       </Button>
                     </div>
                   </div>
-                  <div>
+                  <div className="relative">
                     <label className="block text-sm font-medium mb-1">Rows</label>
-                    {editingContent.rows.map((row: string[], rowIndex: number) => (
-                      <div key={rowIndex} className="flex gap-2 mb-2">
-                        {row.map((cell: string, cellIndex: number) => (
-                          <Input
-                            key={`${rowIndex}-${cellIndex}`}
-                            value={cell}
-                            onChange={(e) => {
-                              const newRows = [...editingContent.rows];
-                              newRows[rowIndex][cellIndex] = e.target.value;
-                              setEditingContent({ ...editingContent, rows: newRows });
-                            }}
-                          />
-                        ))}
-                      </div>
-                    ))}
+                    <div className="max-h-[300px] overflow-y-auto mb-2">
+                      {editingContent.rows.map((row: string[], rowIndex: number) => (
+                        <div key={rowIndex} className="flex gap-2 mb-2 items-center">
+                          {row.map((cell: string, cellIndex: number) => (
+                            <Input
+                              key={`${rowIndex}-${cellIndex}`}
+                              value={cell}
+                              onChange={(e) => {
+                                const newRows = editingContent.rows.map(r => [...r]);
+                                newRows[rowIndex][cellIndex] = e.target.value;
+                                setEditingContent(prev => ({
+                                  ...prev,
+                                  rows: newRows
+                                }));
+                              }}
+                            />
+                          ))}
+                        </div>
+                      ))}
+                    </div>
                     <Button
                       size="sm"
+                      variant="outline"
+                      className="z-50 hover:bg-gray-100 relative"
+                      type="button"
+                      onMouseDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
-                        console.log("DATA")
+                        e.preventDefault();
                         e.stopPropagation();
-                        setEditingContent({
-                          ...editingContent,
-                          rows: [...editingContent.rows, new Array(editingContent.headers.length).fill('')]
-                        });
+                        
+                        const currentRows = editingContent.rows.map(row => [...row]);
+                        const newRow = new Array(editingContent.headers.length).fill('');
+                        
+                        setEditingContent(prev => ({
+                          ...prev,
+                          rows: [...currentRows, newRow]
+                        }));
                       }}
                     >
                       Add Row
