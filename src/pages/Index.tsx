@@ -17,9 +17,9 @@ const MainContent = () => {
   const canRedo = useSelector((state: RootState) => state.layout.history.future.length > 0);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-      <div className="sticky top-0 z-50 backdrop-blur-md bg-white/70 border-b border-indigo-100 shadow-sm">
-        <div className="max-w-7xl mx-auto flex items-center justify-between px-4 py-3">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 w-full">
+      <div className="sticky top-0 z-50 backdrop-blur-md bg-white/70 border-b border-indigo-100 shadow-sm w-full">
+        <div className=" flex items-center justify-between px-4 py-3">
           <h1 className="text-xl font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
             Widget Builder
           </h1>
@@ -60,11 +60,11 @@ const MainContent = () => {
           </div>
         </div>
       </div>
-      <main className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 p-4 lg:p-6 relative">
+      <main className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-1 p-4 lg:p-6 relative">
         <div className="w-full lg:w-[280px] mb-6 lg:mb-0">
           <WidgetSidebar />
         </div>
-        <div className="flex-1 lg:ml-[80px] w-[880px]">
+        <div className="flex-1 ">
           <GridLayout />
         </div>
       </main>

@@ -9,9 +9,15 @@ import { Button } from './ui/button';
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import { Input } from './ui/input';
-import { Pencil, Check, X, Trash2 } from 'lucide-react';
+import { Pencil, Check, X, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from './ui/textarea';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
@@ -29,7 +35,6 @@ interface ButtonWidget extends BaseWidget {
   type: 'button';
   content: string;
   action?: string;
-  variant?: 'primary' | 'secondary' | 'outline';
 }
 
 interface ImageWidget extends BaseWidget {
@@ -42,6 +47,7 @@ interface CardWidget extends BaseWidget {
   type: 'card';
   title: string;
   description: string;
+  isExpanded?: boolean;
 }
 
 interface TableWidget extends BaseWidget {
@@ -51,6 +57,93 @@ interface TableWidget extends BaseWidget {
 }
 
 type WidgetItem = TextWidget | ButtonWidget | ImageWidget | CardWidget | TableWidget;
+
+const promptForTableDimensions = (): { headers: string[]; rows: string[][] } | null => {
+  const numHeaders = parseInt(prompt("Enter number of columns:", "2") || "0");
+  if (isNaN(numHeaders) || numHeaders <= 0) return null;
+
+  const numRows = parseInt(prompt("Enter number of rows:", "2") || "0");
+  if (isNaN(numRows) || numRows <= 0) return null;
+
+  const headers = Array(numHeaders).fill('').map((_, i) => `Header ${i + 1}`);
+  const rows = Array(numRows).fill('').map(() => Array(numHeaders).fill(''));
+
+  return { headers, rows };
+};
+
+const calculateWidgetSize = (item: WidgetItem): { w: number; h: number } => {
+  switch (item.type) {
+    case 'text':
+      const textLength = item.content.length;
+      return {
+        w: Math.min(Math.max(Math.ceil(textLength / 20), 2), 6),
+        h: Math.ceil(textLength / 60) || 1
+      };
+    
+    case 'button':
+      return { w: 2, h: 1 };
+    
+    case 'image':
+      return { w: 4, h: 3 };
+    
+    case 'card':
+      const titleLines = Math.ceil(item.title.length / 30);
+      const descLines = Math.ceil(item.description.length / 60);
+      return {
+        w: Math.min(Math.max(Math.ceil((item.title.length + item.description.length) / 40), 3), 6),
+        h: Math.min(titleLines + descLines, 4)
+      };
+    
+    case 'table':
+      // Calculate height based on number of rows plus header and padding
+      const rowHeight = 40; // height per row in pixels
+      const headerHeight = 40; // height of header row
+      const padding = 20; // total padding (10px top + 10px bottom)
+      const totalHeight = headerHeight + (item.rows.length * rowHeight) + padding;
+      
+      return {
+        w: Math.min(item.headers.length * 2, 12),
+        h: Math.ceil(totalHeight / 100) // Convert pixels to grid units (100 is rowHeight from grid config)
+      };
+    
+    default:
+      return { w: 3, h: 2 };
+  }
+};
+
+
+
+
+const validateWidget = (widget: WidgetItem): string | null => {
+  switch (widget.type) {
+    case 'text':
+      return !widget.content.trim() ? 'Text content cannot be empty' : null;
+    
+    case 'button':
+      if (!widget.content.trim()) return 'Button text cannot be empty';
+      if (!widget.action?.trim()) return 'Button action cannot be empty';
+      return null;
+    
+    case 'image':
+      if (!widget.url.trim()) return 'Image URL cannot be empty';
+      if (!widget.alt.trim()) return 'Image description cannot be empty';
+      return null;
+    
+    case 'card':
+      if (!widget.title.trim()) return 'Card title cannot be empty';
+      if (!widget.description.trim()) return 'Card description cannot be empty';
+      return null;
+    
+    case 'table':
+      if (widget.headers.some(header => !header.trim())) return 'Table headers cannot be empty';
+      if (widget.rows.some(row => row.some(cell => !cell.trim()))) 
+        return 'Table cells cannot be empty';
+      return null;
+    
+    default:
+      return null;
+  }
+};
 
 const GridLayout = () => {
   const dispatch = useDispatch();
@@ -90,41 +183,53 @@ const GridLayout = () => {
     let newItem: WidgetItem;
     switch (widgetData.type) {
       case 'text':
-        newItem = { i: id, type: 'text', content: 'Double click to edit text' };
+        newItem = { i: id, type: 'text', content: 'Text Title' };
         break;
       case 'button':
         newItem = { 
           i: id, 
           type: 'button', 
           content: 'Click me', 
-          action: 'console.log("clicked")',
-          variant: 'primary'
+          action: 'console.log("clicked")'
         };
         break;
       case 'image':
         newItem = { i: id, type: 'image', url: '', alt: 'Image description' };
         break;
       case 'card':
-        newItem = { i: id, type: 'card', title: 'Card Title', description: 'Card description' };
+        newItem = { 
+          i: id, 
+          type: 'card', 
+          title: 'Card Title', 
+          description: 'Card description',
+          isExpanded: false 
+        };
         break;
       case 'table':
+        const dimensions = promptForTableDimensions();
+        if (!dimensions) return;
+
         newItem = {
           i: id,
           type: 'table',
-          headers: ['Header 1', 'Header 2'],
-          rows: [['Data 1', 'Data 2']]
+          headers: dimensions.headers,
+          rows: dimensions.rows
         };
         break;
       default:
         return;
     }
 
+    // Calculate size based on content
+    const size = calculateWidgetSize(newItem);
+
     const newLayout: Layout = {
       i: id,
       x: Math.min(Math.max(0, gridX), 8),
-      y: Math.max(0, gridY), 
-      w: 4,
-      h: 2
+      y: Math.max(0, gridY),
+      w: size.w,
+      h: size.h,
+      isResizable: false
     };
 
     // Find the highest y position of existing layouts
@@ -141,6 +246,10 @@ const GridLayout = () => {
       layouts: [...layouts, newLayout],
       items: [...items, newItem]
     }));
+
+    // Automatically open edit mode for the new widget
+    setEditingId(id);
+    setEditingContent(newItem);
 
     toast({
       variant: "success",
@@ -162,6 +271,19 @@ const GridLayout = () => {
 
   const saveEdits = () => {
     if (!editingId || !editingContent) return;
+
+    // Validate the edited content
+    const validationError = validateWidget(editingContent);
+    
+    if (validationError) {
+      toast({
+        variant: "destructive",
+        title: "Validation Error",
+        description: validationError,
+        duration: 3000,
+      });
+      return;
+    }
     
     dispatch(updateLayoutAndItems({
       layouts,
@@ -169,6 +291,13 @@ const GridLayout = () => {
         item.i === editingId ? { ...editingContent } : item
       )
     }));
+
+    toast({
+      variant: "success",
+      title: "Changes Saved",
+      description: "Widget has been updated successfully",
+      duration: 2000,
+    });
 
     setEditingId(null);
     setEditingContent(null);
@@ -196,53 +325,91 @@ const GridLayout = () => {
       >
         {isEditing ? (
           <>
-            <Button 
-              size="sm" 
-              variant="ghost" 
-              className="bg-white/80 backdrop-blur-sm hover:bg-white"
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                saveEdits();
-              }}
-            >
-              <Check className="h-4 w-4 text-green-600" />
-            </Button>
-            <Button 
-              size="sm" 
-              variant="ghost"
-              className="bg-white/80 backdrop-blur-sm hover:bg-white" 
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                cancelEditing();
-              }}
-            >
-              <X className="h-4 w-4 text-red-600" />
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="bg-white/80 backdrop-blur-sm hover:bg-white"
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                      saveEdits();
+                    }}
+                  >
+                    <Check className="h-4 w-4 text-green-600" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Save changes</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    size="sm" 
+                    variant="ghost"
+                    className="bg-white/80 backdrop-blur-sm hover:bg-white" 
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                      cancelEditing();
+                    }}
+                  >
+                    <X className="h-4 w-4 text-red-600" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Cancel editing</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </>
         ) : (
           <>
-            <Button 
-              size="sm" 
-              variant="ghost"
-              className="bg-white/80 backdrop-blur-sm hover:bg-white" 
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                startEditing(item);
-              }}
-            >
-              <Pencil className="h-4 w-4 text-indigo-600" />
-            </Button>
-            <Button 
-              size="sm" 
-              variant="ghost" 
-              className="bg-white/80 backdrop-blur-sm hover:bg-white"
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                handleDelete(item.i);
-              }}
-            >
-              <Trash2 className="h-4 w-4 text-red-500 hover:text-red-600" />
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    size="sm" 
+                    variant="ghost"
+                    className="bg-white/80 backdrop-blur-sm hover:bg-white" 
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                      startEditing(item);
+                    }}
+                  >
+                    <Pencil className="h-4 w-4 text-indigo-600" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Edit widget</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="bg-white/80 backdrop-blur-sm hover:bg-white"
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                      handleDelete(item.i);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 text-red-500 hover:text-red-600" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Delete widget</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </>
         )}
       </div>
@@ -262,7 +429,7 @@ const GridLayout = () => {
     const isEditing = editingId === item.i;
     
     const cardProps = {
-      className: "w-full h-full p-4 bg-white/90 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 relative group border border-indigo-50 cursor-grab active:cursor-grabbing"
+      className: " transition-all duration-200 relative group cursor-grab active:cursor-grabbing"
     };
 
     switch (item.type) {
@@ -317,46 +484,6 @@ const GridLayout = () => {
                       className="font-mono text-sm border-indigo-100 focus:border-indigo-300"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Style</label>
-                    <div className="flex gap-2">
-                      {['primary', 'secondary', 'outline'].map((variant) => (
-                        <button
-                          key={variant}
-                          type="button"
-                          onMouseDown={(e) => e.stopPropagation()}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setEditingContent(prev => ({
-                              ...prev,
-                              variant: variant as 'primary' | 'secondary' | 'outline'
-                            }));
-                          }}
-                          className={`
-                            px-3 py-1 rounded-md text-sm transition-all duration-200
-                            ${variant === 'primary' && editingContent.variant === 'primary' 
-                              ? 'bg-indigo-500 text-white' 
-                              : variant === 'primary' 
-                              ? 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
-                              : ''}
-                            ${variant === 'secondary' && editingContent.variant === 'secondary'
-                              ? 'bg-gray-800 text-white'
-                              : variant === 'secondary'
-                              ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                              : ''}
-                            ${variant === 'outline' && editingContent.variant === 'outline'
-                              ? 'border-2 border-indigo-500 text-indigo-600'
-                              : variant === 'outline'
-                              ? 'border border-gray-200 text-gray-600 hover:border-gray-300'
-                              : ''}
-                          `}
-                        >
-                          {variant.charAt(0).toUpperCase() + variant.slice(1)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                 </div>
               ) : (
                 <Button 
@@ -372,13 +499,8 @@ const GridLayout = () => {
                       console.error('Error executing button action:', error);
                     }
                   }}
-                  variant={item.variant || 'primary'}
-                  className={`
-                    w-full max-w-[200px] transition-all duration-200 transform hover:scale-105
-                    ${item.variant === 'primary' ? 'bg-indigo-500 hover:bg-indigo-600 text-white' : ''}
-                    ${item.variant === 'secondary' ? 'bg-gray-800 hover:bg-gray-900 text-white' : ''}
-                    ${item.variant === 'outline' ? 'border-2 border-indigo-500 text-indigo-600 hover:bg-indigo-50' : ''}
-                  `}
+                  variant="default"
+                  className="w-full max-w-[200px] transition-all duration-200 transform hover:scale-105"
                 >
                   {item.content}
                 </Button>
@@ -444,8 +566,44 @@ const GridLayout = () => {
                 </>
               ) : (
                 <>
-                  <h3 className="text-lg font-semibold">{item.title}</h3>
-                  <p className="text-gray-500">{item.description}</p>
+                  <div className="flex justify-between items-start gap-2">
+                    <h3 className="text-lg font-semibold">{item.title}</h3>
+                    {item.description.length > 100 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="p-1 -mt-1 h-auto hover:bg-transparent"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const updatedItems = items.map(i => 
+                            i.i === item.i 
+                              ? { ...i, isExpanded: !(i as CardWidget).isExpanded }
+                              : i
+                          );
+                          dispatch(updateLayoutAndItems({
+                            layouts,
+                            items: updatedItems
+                          }));
+                        }}
+                      >
+                        {(item as CardWidget).isExpanded ? (
+                          <ChevronUp className="h-4 w-4 text-gray-500" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-gray-500" />
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                  <p 
+                    className={`text-gray-500 overflow-hidden transition-all duration-300 ${
+                      item.description.length > 100 && !(item as CardWidget).isExpanded
+                        ? 'line-clamp-2'
+                        : ''
+                    }`}
+                  >
+                    {item.description}
+                  </p>
                 </>
               )}
             </div>
@@ -456,9 +614,9 @@ const GridLayout = () => {
         return (
           <Card {...cardProps}>
             <EditButtons item={item} />
-            <div className="h-full overflow-auto relative">
+            <div className="p-2.5">
               {isEditing ? (
-                <div className="space-y-4 p-4" onClick={(e) => e.stopPropagation()}>
+                <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
                   <div>
                     <label className="block text-sm font-medium mb-1">Headers</label>
                     <div className="flex gap-2 items-center relative">
@@ -473,31 +631,6 @@ const GridLayout = () => {
                           }}
                         />
                       ))}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="z-50 hover:bg-gray-100 relative"
-                        type="button"
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          
-                          const currentHeaders = [...editingContent.headers];
-                          const currentRows = editingContent.rows.map(row => [...row]);
-                          
-                          currentHeaders.push('');
-                          currentRows.forEach(row => row.push(''));
-                          
-                          setEditingContent(prev => ({
-                            ...prev,
-                            headers: currentHeaders,
-                            rows: currentRows
-                          }));
-                        }}
-                      >
-                        +
-                      </Button>
                     </div>
                   </div>
                   <div className="relative">
@@ -522,35 +655,14 @@ const GridLayout = () => {
                         </div>
                       ))}
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="z-50 hover:bg-gray-100 relative"
-                      type="button"
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        
-                        const currentRows = editingContent.rows.map(row => [...row]);
-                        const newRow = new Array(editingContent.headers.length).fill('');
-                        
-                        setEditingContent(prev => ({
-                          ...prev,
-                          rows: [...currentRows, newRow]
-                        }));
-                      }}
-                    >
-                      Add Row
-                    </Button>
                   </div>
                 </div>
               ) : (
-                <table className="w-full border-collapse">
+                <table className="w-full border-collapse bg-white rounded-md">
                   <thead>
                     <tr>
                       {item.headers.map((header, index) => (
-                        <th key={index} className="border p-2">{header}</th>
+                        <th key={index} className="border p-2 bg-gray-50">{header}</th>
                       ))}
                     </tr>
                   </thead>
@@ -576,7 +688,7 @@ const GridLayout = () => {
 
   return (
     <div 
-      className="p-4 lg:p-6 min-h-[calc(100vh-120px)] bg-gradient-to-br from-white/50 to-indigo-50/30 backdrop-blur-xl rounded-2xl shadow-inner border border-indigo-100/50"
+      className="p-0 min-h-[calc(100vh-120px)] w-[calc(100vw-400px)] bg-gradient-to-br from-white/50 to-indigo-50/30 backdrop-blur-xl rounded-2xl shadow-inner border border-indigo-100/50"
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
@@ -589,10 +701,9 @@ const GridLayout = () => {
         margin={[16, 16]}
         containerPadding={[16, 16]}
         isDraggable={true}
-        isResizable={true}
+        isResizable={false}
         useCSSTransforms={true}
-        resizeHandles={['se']}
-        compactType={null}
+        compactType="vertical"
         preventCollision={false}
         onDragStart={(layout, oldItem, newItem, placeholder, e, element) => {
           element.classList.add('dragging');
@@ -615,17 +726,17 @@ const GridLayout = () => {
       >
         {items.map((item) => {
           const layout = layouts.find(l => l.i === item.i);
+          const size = calculateWidgetSize(item);
           return (
             <div 
               key={item.i} 
-              className="transition-all duration-200 hover:shadow-lg group cursor-grab active:cursor-grabbing"
+              className=""
               data-grid={{
                 x: layout?.x || 0,
                 y: layout?.y || 0,
-                w: layout?.w || 4,
-                h: layout?.h || 2,
-                minW: 2,
-                minH: 1
+                w: size.w,
+                h: size.h,
+                isResizable: false
               }}
             >
               {renderWidget(item)}
